@@ -1,0 +1,258 @@
+:root {
+  --bg: #0e0f12;
+  --pill: #181a1f;
+  --pill-hover: #1f2228;
+  --pill-edge: #24272e;
+  --fg: #f2f3f5;
+  --sub: #a3a8b1;
+  --muted: #6b7079;
+  --track: #2b2f37;
+  --gauge: #c9ccd2;
+  --warn: #f0b24a;
+  --hot: #ff6b5e;
+  --accent: #e08a68;
+  --live: #6aa8ff;
+  --ok: #5ccf8a;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; overflow: hidden; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 12px/1 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  user-select: none;
+  cursor: default;
+  -webkit-font-smoothing: antialiased;
+}
+
+.bar {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  white-space: nowrap;
+}
+.grow { flex: 1; }
+
+/* Each source sits in its own pill. */
+.pill {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  background: var(--pill);
+  border: 1px solid var(--pill-edge);
+  border-radius: 7px;
+  min-width: 0;
+  transition: background .15s;
+}
+.pill.clickable { cursor: pointer; }
+.pill.clickable:hover { background: var(--pill-hover); }
+
+.brand { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; color: var(--accent); letter-spacing: .1px; }
+.glyph { font-size: 11px; }
+
+/* A stat: small caps label, ring, then the number as the loudest thing. */
+.stat { display: inline-flex; align-items: center; gap: 6px; }
+.label {
+  font-size: 9.5px; font-weight: 600; letter-spacing: .7px; text-transform: uppercase;
+  color: var(--muted);
+}
+.value {
+  font: 600 13.5px/1 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+  text-align: right;
+}
+.unit { font-size: 10.5px; font-weight: 500; color: var(--sub); margin-left: 1px; }
+.value.warn { color: var(--warn); }
+.value.hot { color: var(--hot); }
+
+.ring .track { stroke: var(--track); }
+.ring .fill { stroke: var(--gauge); transition: stroke-dasharray .5s ease; }
+.ring.warn .fill { stroke: var(--warn); }
+.ring.hot .fill { stroke: var(--hot); }
+
+.temp {
+  font: 600 12px/1 "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+  color: var(--sub);
+  padding: 3px 5px; border-radius: 4px; background: #22252b;
+}
+.temp.warn { color: #1a1205; background: var(--warn); }
+.temp.hot { color: #fff; background: var(--hot); }
+
+.limit { display: inline-flex; align-items: center; gap: 8px; }
+.reset { display: inline-flex; flex-direction: column; justify-content: center; gap: 2px; line-height: 1; }
+.countdown { font-size: 11px; font-weight: 600; color: var(--sub); font-variant-numeric: tabular-nums; }
+.at { font-size: 9.5px; color: var(--muted); }
+
+.group { display: inline-flex; align-items: center; gap: 8px; }
+.divider { width: 1px; height: 12px; background: var(--pill-edge); }
+
+/* Janas */
+.model { font-weight: 600; }
+.muted { color: var(--muted); }
+.sub { color: var(--sub); font-size: 11px; font-variant-numeric: tabular-nums; }
+.sub b { color: var(--fg); font-weight: 600; }
+.state { font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; padding: 3px 6px; border-radius: 4px; }
+.state.reading { color: #1a1205; background: var(--warn); }
+.state.writing { color: #06142b; background: var(--live); }
+.progress { width: 70px; height: 5px; border-radius: 3px; background: var(--track); overflow: hidden; }
+.progress > span { display: block; height: 100%; background: var(--warn); border-radius: 3px; transition: width .4s; }
+.janas.reading { border-color: #4a3a1c; }
+.janas.writing, .janas.working { border-color: #24406b; }
+
+.dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--muted); }
+.dot.idle { background: var(--ok); box-shadow: 0 0 6px rgba(92, 207, 138, .5); }
+.dot.reading { background: var(--warn); animation: pulse 1s infinite; }
+.dot.writing, .dot.working { background: var(--live); animation: pulse 1s infinite; }
+.dot.offline { background: #4a4e56; }
+@keyframes pulse { 50% { opacity: .3; } }
+
+.warn { color: var(--warn); }
+.hot { color: var(--hot); }
+
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.link { color: var(--accent); font-weight: 600; }
+.link:hover { text-decoration: underline; }
+.menu-btn {
+  height: 100%; aspect-ratio: 1; display: grid; place-items: center;
+  border-radius: 7px; fill: var(--sub);
+}
+.menu-btn:hover { background: var(--pill); fill: var(--fg); }
+
+/* ---------- Motion ---------- */
+
+/* Pills fade in on launch; the Janas pill glows while the model works. */
+.pill { animation: pill-in .45s cubic-bezier(.2,.8,.2,1) both; }
+.pill:nth-child(2) { animation-delay: .06s; }
+.system { animation-delay: .12s; }
+@keyframes pill-in { from { opacity: 0; transform: translateY(-6px); } }
+.janas.reading { animation: pill-in .45s both, glow-amber 1.6s ease-in-out infinite; }
+.janas.writing, .janas.working { animation: pill-in .45s both, glow-blue 1.6s ease-in-out infinite; }
+@keyframes glow-amber { 50% { box-shadow: 0 0 0 1px #6b5222, 0 0 12px rgba(240,178,74,.25); } }
+@keyframes glow-blue { 50% { box-shadow: 0 0 0 1px #2c4f86, 0 0 12px rgba(106,168,255,.28); } }
+
+/* State tags pop in when they change. */
+.state { animation: tag-pop .35s cubic-bezier(.3,1.6,.5,1) both; }
+@keyframes tag-pop { from { transform: scale(.6); opacity: 0; } }
+
+/* Moving sheen on the prompt progress bar. */
+.progress > span {
+  background: linear-gradient(90deg, var(--warn) 0%, #ffd78a 50%, var(--warn) 100%);
+  background-size: 200% 100%;
+  animation: sheen 1.2s linear infinite;
+}
+@keyframes sheen { to { background-position: -200% 0; } }
+
+/* Hot values breathe so they catch the eye. */
+.value.hot, .temp.hot { animation: hot-pulse 1.4s ease-in-out infinite; }
+@keyframes hot-pulse { 50% { opacity: .65; } }
+
+/* ---------- Hermes ---------- */
+
+.stage { flex: 1; height: 100%; position: relative; min-width: 120px; overflow: hidden; }
+.hermes {
+  position: absolute; left: 0; top: 0; height: 100%;
+  display: flex; align-items: center; gap: 7px;
+  will-change: transform; cursor: default;
+}
+.avatar { position: relative; display: grid; place-items: center; width: 22px; height: 22px; }
+.face { overflow: visible; }
+.face .body { fill: #8b5cf6; transition: fill .4s, filter .4s; }
+.face .eye circle:first-child { fill: #0b0b12; }
+.face .glint { fill: #fff; }
+.face .lids { fill: none; stroke: #0b0b12; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.face .gaze { transition: transform .35s ease; }
+.face .eye { transform-box: fill-box; transform-origin: center; animation: blink 4.2s infinite; }
+.face .eye:nth-child(2) { animation-delay: .04s; }
+@keyframes blink { 0%, 95%, 100% { transform: scaleY(1); } 97% { transform: scaleY(.1); } }
+
+/* Looks the way it walks. */
+.hermes[data-dir="r"] .gaze { transform: translateX(1.1px); }
+.hermes[data-dir="l"] .gaze { transform: translateX(-1.1px); }
+
+/* Walking: a little hop with squash. */
+.hermes.moving .face { animation: hop .34s ease-in-out infinite; }
+@keyframes hop {
+  0%, 100% { transform: translateY(0) scale(1.04, .96); }
+  50% { transform: translateY(-3.5px) scale(.97, 1.03); }
+}
+
+/* Idle: slow breathing, glances around now and then. */
+.hermes.idle .avatar { animation: breathe 3.2s ease-in-out infinite; }
+@keyframes breathe { 50% { transform: scale(1.05); } }
+.hermes.idle:not(.moving) .gaze { animation: glance 9s ease-in-out infinite; }
+@keyframes glance { 0%, 40%, 100% { transform: none; } 45%, 55% { transform: translateX(-1.3px); } 60%, 70% { transform: translateX(1.3px) translateY(-.6px); } }
+
+/* Reading: eyes scan back and forth. */
+.hermes.reading .gaze { animation: scan .9s ease-in-out infinite; }
+@keyframes scan { 0%, 100% { transform: translateX(-1.4px) translateY(.4px); } 50% { transform: translateX(1.4px) translateY(.4px); } }
+.hermes.reading .face .body { fill: #9b6cf8; }
+
+/* Thinking: eyes up, glowing, sparks orbit. */
+.hermes.thinking .gaze { transform: translate(.8px, -1.2px); }
+.hermes.thinking .face .body { filter: drop-shadow(0 0 4px rgba(139,92,246,.85)); animation: think-glow 1.2s ease-in-out infinite; }
+@keyframes think-glow { 50% { fill: #a78bfa; } }
+.sparks { position: absolute; inset: -5px; pointer-events: none; animation: orbit 1.6s linear infinite; }
+.sparks i { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #c4b5fd; box-shadow: 0 0 4px #a78bfa; }
+.sparks i:nth-child(1) { top: 0; left: 50%; }
+.sparks i:nth-child(2) { bottom: 4px; left: 0; width: 2px; height: 2px; }
+.sparks i:nth-child(3) { bottom: 2px; right: 0; }
+@keyframes orbit { to { transform: rotate(360deg); } }
+
+/* Using tools: busy, with a spinning gear. */
+.hermes.tool .face .body { fill: #7c4dff; }
+.hermes.tool .gaze { transform: translateY(.8px); }
+.gear { position: absolute; right: -6px; top: -5px; font-size: 10px; color: #c4b5fd; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Done: a happy jump and a burst of sparkles. */
+.hermes.happy .avatar { animation: jump .6s cubic-bezier(.3,1.5,.5,1) 2; }
+@keyframes jump { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-5px) rotate(-6deg); } 70% { transform: translateY(0) rotate(4deg); } }
+.burst { position: absolute; inset: 0; pointer-events: none; }
+.burst i { position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; border-radius: 50%; background: #5ccf8a; animation: burst .8s ease-out both; }
+.burst i:nth-child(1) { --dx: -13px; --dy: -9px; }
+.burst i:nth-child(2) { --dx: 13px; --dy: -9px; background: #f0b24a; }
+.burst i:nth-child(3) { --dx: -15px; --dy: 4px; background: #c4b5fd; }
+.burst i:nth-child(4) { --dx: 15px; --dy: 4px; }
+.burst i:nth-child(5) { --dx: 0; --dy: -14px; background: #e08a68; }
+@keyframes burst { from { transform: translate(-50%, -50%) scale(1); opacity: 1; } to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(.3); opacity: 0; } }
+
+/* Asleep: grey, still, floating z's. */
+.hermes.sleep .face .body { fill: #4b4560; }
+.hermes.sleep .face .lids { stroke: #1a1824; }
+.hermes.sleep .avatar { animation: breathe 4.5s ease-in-out infinite; }
+.zzz { position: absolute; right: -8px; top: -6px; pointer-events: none; }
+.zzz i { position: absolute; font: 700 8px/1 "Segoe UI", sans-serif; color: #8a82a6; font-style: normal; animation: float-z 2.6s ease-out infinite; }
+.zzz i:nth-child(2) { animation-delay: 1.3s; font-size: 6px; }
+@keyframes float-z { from { transform: translate(0, 6px); opacity: 0; } 30% { opacity: 1; } to { transform: translate(6px, -6px); opacity: 0; } }
+
+/* Speech bubble that follows the avatar. */
+.bubble {
+  position: relative;
+  font-size: 11px; font-weight: 600; color: #ddd6fe;
+  background: #231d38; border: 1px solid #3a2f5e;
+  padding: 3px 8px; border-radius: 9px;
+  font-variant-numeric: tabular-nums;
+  transition: background .3s, color .3s, border-color .3s;
+}
+.bubble::before {
+  content: ""; position: absolute; left: -4px; top: 50%; width: 6px; height: 6px;
+  background: inherit; border-left: 1px solid #3a2f5e; border-bottom: 1px solid #3a2f5e;
+  transform: translateY(-50%) rotate(45deg);
+}
+.hermes.sleep .bubble, .hermes.idle .bubble { color: var(--sub); background: var(--pill); border-color: var(--pill-edge); }
+.hermes.sleep .bubble::before, .hermes.idle .bubble::before { border-color: var(--pill-edge); }
+.hermes.happy .bubble { color: #0b2416; background: var(--ok); border-color: var(--ok); }
+.hermes.happy .bubble::before { border-color: var(--ok); }
+.hermes.reading .bubble { color: #1a1205; background: var(--warn); border-color: var(--warn); }
+.hermes.reading .bubble::before { border-color: var(--warn); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; }
+}

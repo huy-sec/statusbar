@@ -1,0 +1,25 @@
+{
+  "name": "statusbar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Top-docked Windows bar: Claude plan limits, Janas local model activity, CPU/GPU/RAM/temps",
+  "main": "electron/main.js",
+  "scripts": {
+    "build": "vite build",
+    "start": "vite build && electron .",
+    "electron": "electron ."
+  },
+  "dependencies": {
+    "koffi": "^3.3.7",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.2.1",
+    "electron": "^45.2.3",
+    "vite": "^8.3.6"
+  },
+  "allowScripts": {
+    "koffi@3.3.7": true
+  }
+}
