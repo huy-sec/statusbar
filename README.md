@@ -1,3 +1,5 @@
+![statusbar](assets/banner.png)
+
 # Status bar
 
 A thin bar docked to the top of the screen on Windows (Electron + React). Windows treats it
@@ -12,7 +14,7 @@ video is fullscreen.
   the Hermes agent is doing: asleep, idle, reading, thinking, using tools, done.
 - **System:** CPU load and temperature, RAM, and NVIDIA GPU load, temperature and VRAM.
 
-Right-click the bar (or click the tray dot) for the menu: sign in, refresh, preview Hermes
+Right-click the bar (or click the tray icon) for the menu: sign in, refresh, preview Hermes
 moods, hide, start with Windows, settings, quit.
 
 ## Requirements

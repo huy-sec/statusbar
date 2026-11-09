@@ -71,8 +71,12 @@ function push() {
   }, 150);
 }
 
+const ICON = path.join(__dirname, '..', 'assets', 'icon.png');
+
 function trayIcon() {
-  // 16x16 orange dot, drawn in code so no image file is needed.
+  const img = nativeImage.createFromPath(ICON);
+  if (!img.isEmpty()) return img.resize({ width: 16, height: 16, quality: 'best' });
+  // Fallback: a 16x16 dot drawn in code.
   const size = 16, buf = Buffer.alloc(size * size * 4);
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const d = Math.hypot(x - 7.5, y - 7.5), i = (y * size + x) * 4;
@@ -120,7 +124,7 @@ function createBar() {
     width: display.bounds.width, height: config.barHeight,
     frame: false, resizable: false, movable: false, minimizable: false, maximizable: false,
     fullscreenable: false, skipTaskbar: true, alwaysOnTop: true, thickFrame: false,
-    show: false, backgroundColor: '#0e0f12', title: 'Status bar',
+    show: false, backgroundColor: '#0e0f12', title: 'Status bar', icon: ICON,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
   });
   win.setAlwaysOnTop(true, 'pop-up-menu');
