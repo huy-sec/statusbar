@@ -45,7 +45,72 @@ function bubbleText(mood, h, j, now) {
   }
 }
 
-function Face({ mood }) {
+// Characters to choose from (menu > Character, or click the avatar).
+// Each: body shape, where the eyes sit, and any extra parts.
+const CHARACTERS = {
+  banner: {
+    eyes: [[9.5, 10.5], [14.5, 10.5]],
+    body: <rect className="body" x="3" y="2" width="18" height="16" rx="5.5" />,
+    under: null,
+    over: <g className="legs"><rect x="7" y="17.5" width="3" height="5" rx="1.5" /><rect x="14" y="17.5" width="3" height="5" rx="1.5" /></g>,
+  },
+  wings: {
+    eyes: [[9.5, 11.5], [14.5, 11.5]],
+    under: <g className="wings"><path className="wing l" d="M4 10 Q-3 4 -2.5 12.5 Q0.5 14.5 4 13.5Z" /><path className="wing r" d="M20 10 Q27 4 26.5 12.5 Q23.5 14.5 20 13.5Z" /></g>,
+    body: <rect className="body" x="3" y="3" width="18" height="17" rx="5.5" />,
+  },
+  blob: {
+    eyes: [[9.5, 13], [14.5, 13]],
+    body: <path className="body" d="M2.5 22 V10.5 Q2.5 5 8 5 H16 Q21.5 5 21.5 10.5 V22 Q21.5 22.6 20.5 22.6 H3.5 Q2.5 22.6 2.5 22Z" />,
+    squish: true,
+  },
+  ghost: {
+    eyes: [[9, 11], [15, 11]],
+    body: <path className="body" d="M3 22.5 V11 Q3 2 12 2 Q21 2 21 11 V22.5 L18 20 L15 22.5 L12 20 L9 22.5 L6 20Z" />,
+    float: true,
+  },
+  robot: {
+    eyes: [[9.5, 11.5], [14.5, 11.5]],
+    under: <><line className="mast" x1="12" y1="1.5" x2="12" y2="5" /><circle className="ant" cx="12" cy="1.5" r="1.7" /></>,
+    body: <><rect className="body" x="3" y="5" width="18" height="14" rx="3" /><rect className="screen" x="5.5" y="7.5" width="13" height="8" rx="2" /></>,
+    over: <circle className="cog" cx="12" cy="21.5" r="2.4" />,
+  },
+  pixel: {
+    eyes: [[9, 10.5], [15, 10.5]],
+    body: <path className="body" d="M5 2h14v2h2v13h-2v2H5v-2H3V4h2z" />,
+    over: <g className="legs"><rect x="6" y="19" width="4" height="3" /><rect x="14" y="19" width="4" height="3" /></g>,
+    square: true,
+  },
+};
+export const CHARACTER_IDS = ['classic', ...Object.keys(CHARACTERS)];
+
+function CharacterFace({ mood, kind }) {
+  const c = CHARACTERS[kind];
+  const [[lx, ly], [rx, ry]] = c.eyes;
+  let eyes;
+  if (mood === 'sleep') {
+    eyes = <path className="lids" d={`M${lx - 2.1} ${ly} q2.1 1.5 4.2 0 M${rx - 2.1} ${ry} q2.1 1.5 4.2 0`} />;
+  } else if (mood === 'happy') {
+    eyes = <path className="lids" d={`M${lx - 2.1} ${ly + 1} l2.1 -2.3 l2.1 2.3 M${rx - 2.1} ${ry + 1} l2.1 -2.3 l2.1 2.3`} />;
+  } else {
+    eyes = (
+      <g className="gaze">
+        {c.square
+          ? <><rect className="eye oval" x={lx - 1} y={ly - 2.5} width="2" height="5" /><rect className="eye oval" x={rx - 1} y={ry - 2.5} width="2" height="5" /></>
+          : <><ellipse className="eye oval" cx={lx} cy={ly} rx="1.9" ry="3.1" /><ellipse className="eye oval" cx={rx} cy={ry} rx="1.9" ry="3.1" /></>}
+      </g>
+    );
+  }
+  const inner = <>{c.under}{c.body}{eyes}{c.over}</>;
+  return (
+    <svg className={`face k-${kind}`} viewBox="0 0 24 24" width="22" height="22" shapeRendering={c.square ? 'crispEdges' : undefined}>
+      {c.squish ? <g className="squish">{inner}</g> : c.float ? <g className="float">{inner}</g> : inner}
+    </svg>
+  );
+}
+
+function Face({ mood, kind }) {
+  if (CHARACTERS[kind]) return <CharacterFace mood={mood} kind={kind} />;
   let eyes;
   if (mood === 'sleep') {
     eyes = <path className="lids" d="M6.4 11.6 q2.2 1.6 4.4 0 M13.2 11.6 q2.2 1.6 4.4 0" />;
@@ -67,7 +132,7 @@ function Face({ mood }) {
   );
 }
 
-export function HermesStage({ h, j, now }) {
+export function HermesStage({ h, j, now, character = 'banner' }) {
   const mood = hermesMood(h, j);
   const stage = useRef(null);
   const actor = useRef(null);
@@ -127,13 +192,14 @@ export function HermesStage({ h, j, now }) {
     h?.turnsToday ? `Turns today: ${h.turnsToday}` : null,
     h?.lastTurnSecs != null ? `Last turn took ${fmtSecs(h.lastTurnSecs)}` : null,
     j?.online ? `Model: ${j.model}` : 'Model server offline',
+    'Click to change character',
   ].filter(Boolean).join('\n');
 
   return (
     <div className="stage" ref={stage}>
-      <div className={`hermes ${mood}`} ref={actor} title={tip}>
+      <div className={`hermes ${mood}`} ref={actor} title={tip} onClick={() => window.bar.nextCharacter()}>
         <span className="avatar">
-          <Face mood={mood} />
+          <Face mood={mood} kind={character} />
           {mood === 'thinking' && <span className="sparks"><i /><i /><i /></span>}
           {mood === 'tool' && <span className="gear">⚙</span>}
           {mood === 'sleep' && <span className="zzz"><i>z</i><i>z</i></span>}

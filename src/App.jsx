@@ -240,7 +240,7 @@ export default function App() {
     <div className="bar" onContextMenu={(e) => { e.preventDefault(); window.bar.menu(); }}>
       <Claude c={s?.claude} now={s?.now ?? Date.now()} />
       <Janas j={s?.janas} />
-      <HermesStage {...(s?.demo ? demoState(s.now) : { h: s?.hermes, j: s?.janas })} now={s?.now ?? Date.now()} />
+      <HermesStage {...(s?.demo ? demoState(s.now) : { h: s?.hermes, j: s?.janas })} now={s?.now ?? Date.now()} character={s?.character} />
       <System h={s?.hw} />
       <button className="menu-btn" title="Menu" onClick={() => window.bar.menu()}>
         <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="3" cy="7" r="1.3" /><circle cx="7" cy="7" r="1.3" /><circle cx="11" cy="7" r="1.3" /></svg>

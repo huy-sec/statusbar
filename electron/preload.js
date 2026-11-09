@@ -10,4 +10,5 @@ contextBridge.exposeInMainWorld('bar', {
   signIn: () => ipcRenderer.send('claude:signin'),
   refreshClaude: () => ipcRenderer.send('claude:refresh'),
   open: (which) => ipcRenderer.send('open', which),
+  nextCharacter: () => ipcRenderer.send('character:next'),
 });

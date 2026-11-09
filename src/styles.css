@@ -159,7 +159,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .hermes {
   position: absolute; left: 0; top: 0; height: 100%;
   display: flex; align-items: center; gap: 7px;
-  will-change: transform; cursor: default;
+  will-change: transform; cursor: pointer;
 }
 .avatar { position: relative; display: grid; place-items: center; width: 22px; height: 22px; }
 .face { overflow: visible; }
@@ -256,3 +256,64 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; }
 }
+
+/* ---------- Characters ---------- */
+
+.face .oval { fill: #fff; }
+.face .lids { stroke-width: 1.5; }
+.face[class*="k-"]:not(.k-ghost) .lids { stroke: #fff; }
+.hermes.sleep .face[class*="k-"]:not(.k-ghost) .lids { stroke: #a59fbf; }
+
+/* Banner and pixel: little legs that step while walking. */
+.face .legs rect { fill: #7c4ee8; transform-box: fill-box; transition: fill .4s; }
+.hermes.moving .face .legs rect:first-child { animation: step .34s ease-in-out infinite; }
+.hermes.moving .face .legs rect:last-child { animation: step .34s ease-in-out infinite reverse; }
+@keyframes step { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.6px); } }
+.hermes.sleep .face .legs rect { fill: #3d3850; }
+
+/* Winged messenger: wings flap, faster when busy, folded when asleep. */
+.face .wing { fill: #e9e3ff; transform-box: fill-box; animation: flap 1.3s ease-in-out infinite; }
+.face .wing.l { transform-origin: right bottom; }
+.face .wing.r { transform-origin: left bottom; animation-name: flap-r; }
+@keyframes flap { 50% { transform: rotate(28deg); } }
+@keyframes flap-r { 50% { transform: rotate(-28deg); } }
+.hermes.moving .face .wing, .hermes.reading .face .wing { animation-duration: .5s; }
+.hermes.thinking .face .wing, .hermes.tool .face .wing { animation-duration: .22s; }
+.hermes.sleep .face .wing { animation: none; fill: #6d6688; }
+
+/* Blob: a squarish jelly that squishes, more when busy. */
+.face .squish { transform-box: fill-box; transform-origin: center bottom; animation: squish 1.6s ease-in-out infinite; }
+@keyframes squish { 50% { transform: scale(1.1, .88); } }
+.hermes.moving .face .squish { animation-duration: .34s; }
+.hermes.thinking .face .squish, .hermes.tool .face .squish { animation-duration: .45s; }
+.hermes.sleep .face .squish { animation: squish 4s ease-in-out infinite; }
+.hermes.moving .face.k-blob { animation: none; }
+
+/* Ghost: pale, floats instead of hopping, fades out when asleep. */
+.face.k-ghost .oval { fill: #2e1065; }
+.face.k-ghost .lids { stroke: #2e1065; }
+.hermes .face.k-ghost .body { fill: #c4b5fd; }
+.hermes.thinking .face.k-ghost .body { animation: ghost-glow 1.2s ease-in-out infinite; }
+@keyframes ghost-glow { 50% { fill: #ede9fe; } }
+.face .float { animation: float 2.4s ease-in-out infinite; }
+@keyframes float { 50% { transform: translateY(-2.5px); } }
+.hermes.moving .face.k-ghost { animation: none; }
+.hermes.sleep .face.k-ghost { opacity: .4; }
+
+/* Robot: screen face, antenna light, a wheel that turns. */
+.face.k-robot .screen { fill: #1e1b2e; }
+.face.k-robot .oval { fill: #67e8f9; }
+.face.k-robot .lids { stroke: #67e8f9; }
+.face .mast { stroke: #a78bfa; stroke-width: 1.4; }
+.face .ant { fill: #4ade80; animation: pulse 1.6s ease-in-out infinite; }
+.hermes.thinking .face .ant, .hermes.tool .face .ant { fill: #f0b24a; animation-duration: .4s; }
+.hermes.reading .face .ant { fill: #f0b24a; }
+.hermes.sleep .face .ant { fill: #55506a; animation: none; }
+.hermes.sleep .face.k-robot .lids { stroke: #3a6a72; }
+.face .cog { fill: none; stroke: #a78bfa; stroke-width: 1.6; stroke-dasharray: 1.6 1; transform-box: fill-box; transform-origin: center; }
+.hermes.moving .face .cog { animation: spin .8s linear infinite; }
+.hermes.tool .face .cog { animation: spin .4s linear infinite; }
+
+/* Pixel sprite: steppy, retro movement. */
+.hermes.moving .face.k-pixel { animation-timing-function: steps(2); }
+.hermes.moving .face.k-pixel .legs rect { animation-timing-function: steps(2); }

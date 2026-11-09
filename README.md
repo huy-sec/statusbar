@@ -60,9 +60,12 @@ The avatar follows `%LOCALAPPDATA%\hermes\logs\agent.log`. Only event names are 
 (message received, model call, tool call, turn ended); the text of your messages is never read
 into the bar. If the log isn't there, the avatar says "Hermes not found" and naps.
 
+Pick a character from the menu (Character) or click the avatar to cycle through them:
+Classic, Hermes, Winged messenger, Blob, Ghost, Robot and Pixel sprite. The choice is saved.
+
 ## Settings
 
-`%APPDATA%\statusbar\config.json`: `barHeight`, `janasUrl`, `metricsFile`, `claudePollMinutes`.
+`%APPDATA%\statusbar\config.json`: `barHeight`, `janasUrl`, `metricsFile`, `claudePollMinutes`, `character`.
 Restart the bar after editing.
 
 ## License

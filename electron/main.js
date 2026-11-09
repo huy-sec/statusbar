@@ -14,7 +14,28 @@ const DEFAULTS = {
   janasUrl: 'http://127.0.0.1:8080',
   metricsFile: path.join(process.env.LOCALAPPDATA || '', 'janas', 'metrics.jsonl'),
   claudePollMinutes: 5,
+  character: 'banner',
 };
+
+const CHARACTERS = [
+  ['classic', 'Classic'], ['banner', 'Hermes'], ['wings', 'Winged messenger'], ['blob', 'Blob'],
+  ['ghost', 'Ghost'], ['robot', 'Robot'], ['pixel', 'Pixel sprite'],
+];
+
+function setCharacter(id) {
+  config.character = id;
+  try {
+    let user = {};
+    try { user = JSON.parse(fs.readFileSync(config.file, 'utf8')); } catch {}
+    fs.writeFileSync(config.file, JSON.stringify({ ...user, character: id }, null, 2));
+  } catch (e) { console.error('could not save character:', e); }
+  push();
+}
+
+function nextCharacter() {
+  const i = CHARACTERS.findIndex(([id]) => id === config.character);
+  setCharacter(CHARACTERS[(i + 1) % CHARACTERS.length][0]);
+}
 
 function loadConfig() {
   const file = path.join(app.getPath('userData'), 'config.json');
@@ -36,6 +57,7 @@ function state() {
     janas: janas.snapshot(hw.state.janasProc),
     hw: hw.state,
     hermes: hermes.state,
+    character: config.character,
     now: Date.now(),
     demo: Date.now() < demoUntil,
   };
@@ -72,6 +94,8 @@ function menu() {
     signedIn && claude.state.source === 'claude.ai'
       ? { label: 'Sign out of claude.ai', click: () => claude.signOut() }
       : { label: 'Sign in to claude.ai…', click: () => claude.openSignIn() },
+    { label: 'Character', submenu: CHARACTERS.map(([id, label]) => (
+      { label, type: 'radio', checked: config.character === id, click: () => setCharacter(id) })) },
     { label: 'Preview Hermes moods', click: () => { demoUntil = Date.now() + 30000; push(); } },
     { label: 'Open claude.ai usage page', click: () => shell.openExternal('https://claude.ai/settings/usage') },
     { type: 'separator' },
@@ -133,6 +157,7 @@ app.whenReady().then(() => {
   ipcMain.on('menu', () => menu().popup({ window: win }));
   ipcMain.on('claude:signin', () => claude.openSignIn());
   ipcMain.on('claude:refresh', () => claude.refresh());
+  ipcMain.on('character:next', nextCharacter);
   ipcMain.on('open', (_e, which) => {
     const urls = { usage: 'https://claude.ai/settings/usage', janasDocs: 'http://127.0.0.1:8080/' };
     if (urls[which]) shell.openExternal(urls[which]);
