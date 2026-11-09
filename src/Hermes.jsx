@@ -24,8 +24,8 @@ export function hermesMood(h, j) {
   if (a === 'reading') return 'reading';
   if (h?.phase === 'tool') return 'tool';
   if (a === 'writing' || a === 'working' || h?.phase === 'thinking') return 'thinking';
-  if (h?.online || j?.online) return 'idle';
-  return 'sleep';
+  // Nothing in progress: awake only while the model is up, asleep when it's offline.
+  return j?.online ? 'idle' : 'sleep';
 }
 
 function bubbleText(mood, h, j, now) {
@@ -41,7 +41,7 @@ function bubbleText(mood, h, j, now) {
     case 'tool': return elapsed != null ? `using tools · ${fmtSecs(elapsed)}` : 'using tools';
     case 'happy': return h?.lastTurnSecs != null ? `done in ${fmtSecs(h.lastTurnSecs)}` : 'done!';
     case 'idle': return 'idle';
-    default: return h?.available === false ? 'Hermes not found' : 'asleep';
+    default: return h?.available === false ? 'Hermes not found' : j?.online ? 'asleep' : 'asleep · model offline';
   }
 }
 
