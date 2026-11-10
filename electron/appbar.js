@@ -32,6 +32,24 @@ function foregroundIsDesktop() {
   return DESKTOP_CLASSES.has(String.fromCharCode(...buf.slice(0, len)));
 }
 
+const GetWindowRect = user32.func('bool __stdcall GetWindowRect(intptr hWnd, _Out_ RECT *lpRect)');
+const MonitorFromWindow = user32.func('intptr __stdcall MonitorFromWindow(intptr hwnd, uint32 dwFlags)');
+const MONITORINFO = koffi.struct('MONITORINFO', { cbSize: 'uint32', rcMonitor: RECT, rcWork: RECT, dwFlags: 'uint32' });
+const GetMonitorInfoW = user32.func('bool __stdcall GetMonitorInfoW(intptr hMonitor, _Inout_ MONITORINFO *lpmi)');
+
+// Checks directly whether the window in front covers its whole monitor, so the bar can
+// come back even if Windows never sends the "fullscreen ended" message (common at sign-in).
+function foregroundIsFullscreen() {
+  if (foregroundIsDesktop()) return false;
+  const hwnd = GetForegroundWindow();
+  const r = {};
+  if (!GetWindowRect(hwnd, r)) return false;
+  const mi = { cbSize: koffi.sizeof(MONITORINFO), rcMonitor: {}, rcWork: {}, dwFlags: 0 };
+  if (!GetMonitorInfoW(MonitorFromWindow(hwnd, 2 /* nearest */), mi)) return false;
+  const m = mi.rcMonitor;
+  return r.left <= m.left && r.top <= m.top && r.right >= m.right && r.bottom >= m.bottom;
+}
+
 const ABM_NEW = 0, ABM_REMOVE = 1, ABM_QUERYPOS = 2, ABM_SETPOS = 3;
 const ABE_TOP = 1;
 const ABN_POSCHANGED = 1, ABN_FULLSCREENAPP = 2;
@@ -104,4 +122,4 @@ class AppBar {
   }
 }
 
-module.exports = { AppBar };
+module.exports = { AppBar, foregroundIsFullscreen };

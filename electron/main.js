@@ -1,13 +1,31 @@
 const path = require('path');
 const fs = require('fs');
 const { app, BrowserWindow, Tray, Menu, nativeImage, screen, ipcMain, shell } = require('electron');
-const { AppBar } = require('./appbar');
+const { AppBar, foregroundIsFullscreen } = require('./appbar');
 const { HardwareCollector } = require('./collectors/hardware');
 const { JanasCollector } = require('./collectors/janas');
 const { ClaudeCollector } = require('./collectors/claude');
 const { HermesCollector } = require('./collectors/hermes');
 
 if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0); }
+
+// A small log in %APPDATA%\statusbar\statusbar.log, so startup problems can be seen afterwards.
+const LOG = path.join(app.getPath('userData'), 'statusbar.log');
+function log(...parts) {
+  try {
+    if (fs.existsSync(LOG) && fs.statSync(LOG).size > 512 * 1024) fs.renameSync(LOG, LOG + '.old');
+    fs.appendFileSync(LOG, `${new Date().toISOString()} ${parts.join(' ')}\n`);
+  } catch {}
+}
+process.on('uncaughtException', (e) => log('error:', e && e.stack || e));
+
+const AT_LOGIN = process.argv.includes('--startup');
+log('start', AT_LOGIN ? '(at sign-in)' : '', process.argv.slice(1).join(' '));
+
+// The bar is simple enough to draw without the GPU. Leaving it off avoids Electron quitting
+// when the graphics process fails early in sign-in, and keeps the laptop's NVIDIA GPU asleep.
+app.disableHardwareAcceleration();
+app.on('child-process-gone', (_e, d) => log('child process gone:', d.type, d.reason, d.exitCode));
 
 const DEFAULTS = {
   barHeight: 32,
@@ -87,7 +105,19 @@ function trayIcon() {
 }
 
 function loginItemArgs() {
-  return app.isPackaged ? {} : { path: process.execPath, args: [app.getAppPath()] };
+  return app.isPackaged
+    ? { args: ['--startup'] }
+    : { path: process.execPath, args: [app.getAppPath(), '--startup'] };
+}
+
+// Older versions registered the startup entry without --startup; move it over.
+function migrateLoginItem() {
+  const old = app.isPackaged ? {} : { path: process.execPath, args: [app.getAppPath()] };
+  if (app.getLoginItemSettings(old).openAtLogin && !app.getLoginItemSettings(loginItemArgs()).openAtLogin) {
+    app.setLoginItemSettings({ openAtLogin: false, ...old });
+    app.setLoginItemSettings({ openAtLogin: true, ...loginItemArgs() });
+    log('moved startup entry to --startup');
+  }
 }
 
 function menu() {
@@ -113,8 +143,31 @@ function menu() {
 }
 
 function toggleBar() {
-  if (win.isVisible()) { appbar.unregister(); win.hide(); }
+  userHidden = win.isVisible();
+  if (userHidden) { appbar.unregister(); win.hide(); }
   else { win.show(); appbar.register(screen.getPrimaryDisplay()); }
+}
+
+// Fullscreen handling. Windows tells us when a fullscreen app starts and stops, but at
+// sign-in (lock and welcome screens) the "stopped" message can go missing. While hidden
+// for fullscreen, check every few seconds and come back once nothing covers the screen.
+let userHidden = false, fsHidden = false, fsTimer = null;
+function setFullscreen(on) {
+  log('fullscreen', on ? 'on' : 'off');
+  if (on) {
+    fsHidden = true;
+    win.setAlwaysOnTop(false);
+    win.hide();
+    if (!fsTimer) fsTimer = setInterval(() => { if (!foregroundIsFullscreen()) setFullscreen(false); }, 3000);
+  } else {
+    clearInterval(fsTimer); fsTimer = null;
+    if (!fsHidden) return;
+    fsHidden = false;
+    if (userHidden) return;
+    win.setAlwaysOnTop(true, 'pop-up-menu');
+    win.showInactive();
+    try { appbar.position(screen.getPrimaryDisplay()); } catch {}
+  }
 }
 
 function createBar() {
@@ -134,16 +187,28 @@ function createBar() {
     appbar = new AppBar(win, {
       height: config.barHeight,
       // Step aside while a game or video is fullscreen.
-      onFullscreen: (on) => { win.setAlwaysOnTop(!on, 'pop-up-menu'); if (on) win.hide(); else win.showInactive(); },
+      onFullscreen: setFullscreen,
     });
-    try { appbar.register(screen.getPrimaryDisplay()); }
-    catch (e) { console.error('appbar registration failed, bar will float instead:', e); }
+    try { appbar.register(screen.getPrimaryDisplay()); log('docked'); }
+    catch (e) { log('appbar registration failed, bar will float instead:', e && e.stack || e); }
     push();
+    // At sign-in the taskbar may still be settling: dock again a little later.
+    if (AT_LOGIN) setTimeout(() => {
+      if (!win.isVisible() && !userHidden && !foregroundIsFullscreen()) { win.showInactive(); log('shown after sign-in'); }
+      try { appbar.position(screen.getPrimaryDisplay()); } catch {}
+    }, 15000);
   });
   win.webContents.on('did-finish-load', push);
+  win.webContents.on('render-process-gone', (_e, d) => {
+    log('bar page crashed:', d.reason, '- reloading');
+    setTimeout(() => { if (!win.isDestroyed()) win.reload(); }, 1000);
+  });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // At sign-in, give Windows a few seconds to finish starting the desktop first.
+  if (AT_LOGIN) await new Promise((r) => setTimeout(r, 8000));
+  migrateLoginItem();
   config = loadConfig();
   hw = new HardwareCollector();
   janas = new JanasCollector(config);
