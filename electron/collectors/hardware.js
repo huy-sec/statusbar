@@ -21,12 +21,29 @@ $cores = [Environment]::ProcessorCount
 # The graphics card with the most dedicated memory (the discrete one, if there is one).
 $card = Get-ChildItem 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}' |
   Where-Object { $_.PSChildName -match '^\\d{4}$' } |
-  ForEach-Object { $p = Get-ItemProperty $_.PSPath; [pscustomobject]@{ name = $p.DriverDesc; mem = [int64]$p.'HardwareInformation.qwMemorySize' } } |
-  Sort-Object mem -Descending | Select-Object -First 1
+  ForEach-Object {
+    $p = Get-ItemProperty $_.PSPath
+    # Drivers record the memory size in different places (AMD often only the older one).
+    $m = [int64]$p.'HardwareInformation.qwMemorySize'
+    if ($m -le 0) {
+      $v = $p.'HardwareInformation.MemorySize'
+      if ($v -is [byte[]] -and $v.Length -ge 4) { $m = [int64][BitConverter]::ToUInt32($v, 0) } elseif ($v) { $m = [int64]$v }
+    }
+    [pscustomobject]@{ name = $p.DriverDesc; mem = $m }
+  } | Sort-Object mem -Descending | Select-Object -First 1
+if ($card -and $card.mem -le 0) {
+  $vc = Get-CimInstance Win32_VideoController | Where-Object { $_.Name -eq $card.name } | Select-Object -First 1
+  if ($vc.AdapterRAM -gt 0) { $card.mem = [int64]$vc.AdapterRAM }  # capped at 4 GB by Windows
+}
 function Get-Gpu {
   if (-not $card) { return $null }
-  # Load: the busiest engine type, summed over processes, like Task Manager.
+  # The main card is the adapter using the most dedicated memory; a built-in chip uses little.
+  $mem = Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory
+  $main = $mem | Sort-Object DedicatedUsage -Descending | Select-Object -First 1
+  $luid = if ($main -and $main.Name -match '^(luid_0x[0-9a-fA-F]+_0x[0-9a-fA-F]+)') { $matches[1] } else { $null }
+  # Load: that card's busiest engine type, summed over processes, like Task Manager.
   $eng = Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine
+  if ($luid) { $eng = $eng | Where-Object { $_.Name -like "*$luid*" } }
   $util = $null
   if ($eng) {
     $util = ($eng | Group-Object { if ($_.Name -match 'engtype_(.+)$') { $matches[1] } else { 'x' } } |
@@ -34,8 +51,7 @@ function Get-Gpu {
       Measure-Object -Maximum).Maximum
     if ($util -gt 100) { $util = 100 }
   }
-  $mem = Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory
-  $used = if ($mem) { ($mem | Measure-Object DedicatedUsage -Maximum).Maximum } else { $null }
+  $used = if ($main) { $main.DedicatedUsage } else { $null }
   @{ name = $card.name; util = $util; memUsed = if ($used -ne $null) { [math]::Round($used / 1MB) } else { $null };
      memTotal = if ($card.mem -gt 0) { [math]::Round($card.mem / 1MB) } else { $null } }
 }
@@ -132,10 +148,10 @@ class HardwareCollector extends EventEmitter {
   // Windows' counters, used when nvidia-smi has given nothing for a while.
   useWindowsGpu(g) {
     if (this.nvidiaAt && Date.now() - this.nvidiaAt < 10000) return;
-    if (!g || g.memTotal == null) { this.state.gpu = null; return; }
+    if (!g || (g.memTotal == null && g.util == null)) { this.state.gpu = null; return; }
     this.state.gpu = {
       name: String(g.name || 'GPU').replace(/^(NVIDIA (GeForce )?|AMD (Radeon\(TM\) )?|Intel\(R\) )/, ''),
-      util: g.util ?? null, memUsed: g.memUsed ?? null, memTotal: g.memTotal,
+      util: g.util ?? null, memUsed: g.memUsed ?? null, memTotal: g.memTotal ?? null,
       temp: null, power: null,
     };
   }

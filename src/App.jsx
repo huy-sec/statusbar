@@ -213,10 +213,15 @@ function System({ h }) {
       {g && (
         <>
           <span className="divider" />
-          <span className="group" title={`${g.name}\nVRAM ${n0(g.memUsed)} of ${n0(g.memTotal)} MiB\nPower ${g.power ?? '–'} W`}>
+          <span className="group" title={[
+            g.name,
+            g.memTotal ? `VRAM ${n0(g.memUsed)} of ${n0(g.memTotal)} MiB` : null,
+            g.power != null ? `Power ${g.power} W` : null,
+            g.temp == null ? 'Temperature not available for this card' : null,
+          ].filter(Boolean).join('\n')}>
             <Stat label="GPU" pct={g.util} num={g.util} unit="%" t={tone(g.util, 80, 95)} width="3.4ch" />
             <Temp c={g.temp} warn={75} hot={87} />
-            <Stat label="VRAM" pct={vramPct} num={g.memUsed / 1024} decimals={1} unit={` / ${Math.round(g.memTotal / 1024)} GB`} t={tone(vramPct, 85, 95)} />
+            {g.memTotal ? <Stat label="VRAM" pct={vramPct} num={g.memUsed / 1024} decimals={1} unit={` / ${Math.round(g.memTotal / 1024)} GB`} t={tone(vramPct, 85, 95)} /> : null}
           </span>
         </>
       )}
