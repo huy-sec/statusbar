@@ -1,12 +1,44 @@
-// CPU, RAM, temperature, NVIDIA GPU, and the Janas process's own CPU/memory.
-// Nothing here needs admin rights.
+// CPU, RAM, temperature, GPU, and the Janas process's own CPU/memory.
+// NVIDIA cards are read with nvidia-smi (with temperature and power). Any other card
+// (AMD, Intel) falls back to Windows' own GPU counters, the ones Task Manager shows:
+// load and VRAM, without temperature. Nothing here needs admin rights.
+const fs = require('fs');
 const os = require('os');
+const path = require('path');
 const { spawn } = require('child_process');
 const { EventEmitter } = require('events');
+
+// nvidia-smi is normally on the PATH, but not always.
+const NVIDIA_SMI = [
+  'nvidia-smi',
+  path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'nvidia-smi.exe'),
+  path.join(process.env.ProgramFiles || 'C:\\Program Files', 'NVIDIA Corporation', 'NVSMI', 'nvidia-smi.exe'),
+];
 
 const PS_SCRIPT = `
 $ErrorActionPreference = 'SilentlyContinue'
 $cores = [Environment]::ProcessorCount
+# The graphics card with the most dedicated memory (the discrete one, if there is one).
+$card = Get-ChildItem 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}' |
+  Where-Object { $_.PSChildName -match '^\\d{4}$' } |
+  ForEach-Object { $p = Get-ItemProperty $_.PSPath; [pscustomobject]@{ name = $p.DriverDesc; mem = [int64]$p.'HardwareInformation.qwMemorySize' } } |
+  Sort-Object mem -Descending | Select-Object -First 1
+function Get-Gpu {
+  if (-not $card) { return $null }
+  # Load: the busiest engine type, summed over processes, like Task Manager.
+  $eng = Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine
+  $util = $null
+  if ($eng) {
+    $util = ($eng | Group-Object { if ($_.Name -match 'engtype_(.+)$') { $matches[1] } else { 'x' } } |
+      ForEach-Object { ($_.Group | Measure-Object UtilizationPercentage -Sum).Sum } |
+      Measure-Object -Maximum).Maximum
+    if ($util -gt 100) { $util = 100 }
+  }
+  $mem = Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUAdapterMemory
+  $used = if ($mem) { ($mem | Measure-Object DedicatedUsage -Maximum).Maximum } else { $null }
+  @{ name = $card.name; util = $util; memUsed = if ($used -ne $null) { [math]::Round($used / 1MB) } else { $null };
+     memTotal = if ($card.mem -gt 0) { [math]::Round($card.mem / 1MB) } else { $null } }
+}
 while ($true) {
   $tz = Get-CimInstance Win32_PerfFormattedData_Counters_ThermalZoneInformation |
         ForEach-Object { if ($_.HighPrecisionTemperature) { $_.HighPrecisionTemperature / 10 - 273.15 } else { $_.Temperature - 273.15 } }
@@ -14,7 +46,7 @@ while ($true) {
   $p = Get-CimInstance Win32_PerfFormattedData_PerfProc_Process -Filter "Name='janas-server'"
   $j = $null
   if ($p) { $p = @($p)[0]; $j = @{ cpu = [math]::Round($p.PercentProcessorTime / $cores, 1); mem = [int64]$p.WorkingSetPrivate } }
-  @{ temp = $temp; janas = $j } | ConvertTo-Json -Compress
+  @{ temp = $temp; janas = $j; gpu = (Get-Gpu) } | ConvertTo-Json -Compress
   Start-Sleep -Seconds 3
 }`;
 
@@ -69,17 +101,25 @@ class HardwareCollector extends EventEmitter {
     if (!this.stopped) setTimeout(() => !this.stopped && fn.call(this), delay);
   }
 
-  startNvidia() {
-    const child = spawn('nvidia-smi', [
+  startNvidia(attempt = 0) {
+    // Try each place nvidia-smi may live; with none, the Windows counters take over.
+    const exe = NVIDIA_SMI.find((p, i) => i >= attempt && (p === 'nvidia-smi' || fs.existsSync(p)));
+    if (!exe) { this.respawn(() => this.startNvidia(0), 60000); return; }
+    const next = NVIDIA_SMI.indexOf(exe) + 1;
+    const child = spawn(exe, [
       '--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw',
       '--format=csv,noheader,nounits', '-lms', '2000',
     ], { windowsHide: true });
     this.children.push(child);
-    child.on('error', () => { this.state.gpu = null; });
-    child.on('exit', () => this.respawn(this.startNvidia, 15000));
+    let gotData = false;
+    child.on('error', () => {});
+    child.on('exit', () => this.respawn(() => this.startNvidia(gotData ? 0 : next), gotData ? 15000 : 500));
     this.lines(child, (line) => {
       const [name, util, memUsed, memTotal, temp, power] = line.split(',').map((s) => s.trim());
       const num = (s) => (s === undefined || isNaN(Number(s)) ? null : Number(s));
+      if (num(memTotal) == null) return; // not a data line (an error message)
+      gotData = true;
+      this.nvidiaAt = Date.now();
       this.state.gpu = {
         name: name.replace(/^NVIDIA (GeForce )?/, ''),
         util: num(util), memUsed: num(memUsed), memTotal: num(memTotal),
@@ -87,6 +127,17 @@ class HardwareCollector extends EventEmitter {
       };
       this.emit('update');
     });
+  }
+
+  // Windows' counters, used when nvidia-smi has given nothing for a while.
+  useWindowsGpu(g) {
+    if (this.nvidiaAt && Date.now() - this.nvidiaAt < 10000) return;
+    if (!g || g.memTotal == null) { this.state.gpu = null; return; }
+    this.state.gpu = {
+      name: String(g.name || 'GPU').replace(/^(NVIDIA (GeForce )?|AMD (Radeon\(TM\) )?|Intel\(R\) )/, ''),
+      util: g.util ?? null, memUsed: g.memUsed ?? null, memTotal: g.memTotal,
+      temp: null, power: null,
+    };
   }
 
   startPowerShell() {
@@ -98,6 +149,7 @@ class HardwareCollector extends EventEmitter {
         const d = JSON.parse(line);
         this.state.temp = d.temp ?? null;
         this.state.janasProc = d.janas ?? null;
+        this.useWindowsGpu(d.gpu);
         this.emit('update');
       } catch {}
     });
