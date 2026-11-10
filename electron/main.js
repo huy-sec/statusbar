@@ -198,6 +198,18 @@ function createBar() {
       try { appbar.position(screen.getPrimaryDisplay()); } catch {}
     }, 15000);
   });
+  // The bar only closes through Quit. Anything else (Alt+F4, a tool closing windows) is
+  // refused, and if the window is destroyed anyway, a new one is made.
+  win.on('close', (e) => { if (!quitting) { e.preventDefault(); log('close refused'); } });
+  win.on('closed', () => {
+    log('window closed', quitting ? '(quitting)' : '- making a new one');
+    if (quitting) return;
+    try { appbar && appbar.unregister(); } catch {}
+    appbar = null;
+    setTimeout(createBar, 1000);
+  });
+  win.on('session-end', () => log('windows session ending'));
+  win.on('unresponsive', () => log('window unresponsive'));
   win.webContents.on('did-finish-load', push);
   win.webContents.on('render-process-gone', (_e, d) => {
     log('bar page crashed:', d.reason, '- reloading');
@@ -232,16 +244,24 @@ app.whenReady().then(async () => {
     if (urls[which]) shell.openExternal(urls[which]);
   });
 
-  const reposition = () => { if (appbar && win.isVisible()) appbar.position(screen.getPrimaryDisplay()); };
+  const reposition = () => {
+    if (appbar && win && !win.isDestroyed() && win.isVisible()) {
+      try { appbar.position(screen.getPrimaryDisplay()); } catch (e) { log('reposition failed:', e.message); }
+    }
+  };
   screen.on('display-metrics-changed', reposition);
   screen.on('display-added', reposition);
   screen.on('display-removed', reposition);
   setInterval(push, 1000); // keeps countdowns ticking
 });
 
-app.on('second-instance', () => { if (win && !win.isVisible()) toggleBar(); });
+app.on('second-instance', () => { if (win && !win.isDestroyed() && !win.isVisible()) toggleBar(); });
 
+let quitting = false;
+process.on('exit', (code) => log('exit, code', code));
 app.on('before-quit', () => {
+  quitting = true;
+  log('quit requested');
   try { appbar && appbar.unregister(); } catch {}
   for (const c of [hw, janas, claude, hermes]) { try { c && c.stop(); } catch {} }
 });
