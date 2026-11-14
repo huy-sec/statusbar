@@ -17,6 +17,12 @@ const SHAppBarMessage = shell32.func(
   'uintptr __stdcall SHAppBarMessage(uint32 dwMessage, _Inout_ APPBARDATA *pData)'
 );
 
+const dwmapi = koffi.load('dwmapi.dll');
+const DwmGetWindowAttribute = dwmapi.func(
+  'int __stdcall DwmGetWindowAttribute(intptr hwnd, uint32 attr, _Out_ RECT *value, uint32 size)'
+);
+const DWMWA_EXTENDED_FRAME_BOUNDS = 9; // the visible frame, in physical pixels
+
 const user32 = koffi.load('user32.dll');
 const GetForegroundWindow = user32.func('intptr __stdcall GetForegroundWindow()');
 const GetClassNameW = user32.func('int __stdcall GetClassNameW(intptr hWnd, _Out_ uint16_t *lpClassName, int nMaxCount)');
@@ -112,6 +118,14 @@ class AppBar {
       width: Math.round((d.rc.right - d.rc.left) / sf),
       height: this.height,
     });
+    // Windows may draw the bar taller than asked (minimum window sizes, the 1 px Windows 11
+    // border). Reserve what is really on screen, so nothing slides underneath the bar.
+    const vis = { left: 0, top: 0, right: 0, bottom: 0 };
+    if (DwmGetWindowAttribute(this.hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, vis, koffi.sizeof(RECT)) === 0
+        && vis.bottom > d.rc.bottom) {
+      d.rc.bottom = vis.bottom;
+      SHAppBarMessage(ABM_SETPOS, d);
+    }
   }
 
   unregister() {

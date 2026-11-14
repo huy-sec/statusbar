@@ -176,7 +176,10 @@ function createBar() {
     x: display.bounds.x, y: display.bounds.y,
     width: display.bounds.width, height: config.barHeight,
     frame: false, resizable: false, movable: false, minimizable: false, maximizable: false,
-    fullscreenable: false, skipTaskbar: true, alwaysOnTop: true, thickFrame: false,
+    fullscreenable: false, skipTaskbar: true, alwaysOnTop: true,
+    // thickFrame stays on: without it Windows enforces a ~39 px minimum height, so a 32 px
+    // bar came out taller than the strip it reserved and covered the top of other windows.
+    thickFrame: true,
     show: false, backgroundColor: '#0e0f12', title: 'Status bar', icon: ICON,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
   });
