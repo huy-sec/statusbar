@@ -56,6 +56,11 @@ function foregroundIsFullscreen() {
   return r.left <= m.left && r.top <= m.top && r.right >= m.right && r.bottom >= m.bottom;
 }
 
+// Explorer broadcasts this when the taskbar is (re)created. A restart of Explorer drops every
+// appbar registration, so the bar has to dock again when it sees it.
+const RegisterWindowMessageW = user32.func('uint32 __stdcall RegisterWindowMessageW(str16 lpString)');
+const TASKBAR_CREATED = RegisterWindowMessageW('TaskbarCreated');
+
 const ABM_NEW = 0, ABM_REMOVE = 1, ABM_QUERYPOS = 2, ABM_SETPOS = 3;
 const ABE_TOP = 1;
 const ABN_POSCHANGED = 1, ABN_FULLSCREENAPP = 2;
@@ -69,6 +74,29 @@ class AppBar {
     this.registered = false;
     const buf = win.getNativeWindowHandle();
     this.hwnd = Number(buf.length >= 8 ? buf.readBigUInt64LE(0) : buf.readUInt32LE(0));
+    if (TASKBAR_CREATED) {
+      win.hookWindowMessage(TASKBAR_CREATED, () => {
+        if (!this.registered) return; // hidden by the user: stay undocked
+        setTimeout(() => this.redock('taskbar restarted'), 1000);
+      });
+    }
+  }
+
+  // Registers again from scratch, for when Windows has forgotten the bar.
+  redock(reason) {
+    if (!this.registered || !this.display) return;
+    this.registered = false;
+    try { this.register(this.display); if (this.onRedock) this.onRedock(reason); }
+    catch (e) { if (this.onRedock) this.onRedock(`${reason}, failed: ${e.message}`); }
+  }
+
+  // True when Windows no longer keeps the bar's strip free (work area starts above the
+  // strip's bottom edge), e.g. after a shell restart that TaskbarCreated didn't cover.
+  lostReservation() {
+    if (!this.registered || !this.reservedBottom) return false;
+    const mi = { cbSize: koffi.sizeof(MONITORINFO), rcMonitor: {}, rcWork: {}, dwFlags: 0 };
+    if (!GetMonitorInfoW(MonitorFromWindow(this.hwnd, 2 /* nearest */), mi)) return false;
+    return mi.rcWork.top < this.reservedBottom;
   }
 
   data(rc) {
@@ -110,7 +138,12 @@ class AppBar {
       bottom: Math.round((b.y + this.height) * sf),
     });
     SHAppBarMessage(ABM_QUERYPOS, d);
-    d.rc.bottom = d.rc.top + Math.round(this.height * sf);
+    const asked = Math.round(this.height * sf);
+    // Windows may draw the bar taller than asked (the 1 px Windows 11 border, minimum window
+    // sizes). The extra is measured once and remembered, because the visible frame can read
+    // short right after a move and the strip would shrink back by a pixel.
+    this.extraPx = this.extraPx || 0;
+    d.rc.bottom = d.rc.top + asked + this.extraPx;
     SHAppBarMessage(ABM_SETPOS, d);
     this.win.setBounds({
       x: Math.round(d.rc.left / sf),
@@ -118,14 +151,17 @@ class AppBar {
       width: Math.round((d.rc.right - d.rc.left) / sf),
       height: this.height,
     });
-    // Windows may draw the bar taller than asked (minimum window sizes, the 1 px Windows 11
-    // border). Reserve what is really on screen, so nothing slides underneath the bar.
     const vis = { left: 0, top: 0, right: 0, bottom: 0 };
+    // Only trust a reading taken with the window already in place at the top, and only a
+    // few pixels' worth: right after creation the frame can still report an old position.
     if (DwmGetWindowAttribute(this.hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, vis, koffi.sizeof(RECT)) === 0
-        && vis.bottom > d.rc.bottom) {
+        && Math.abs(vis.top - d.rc.top) <= 1 && vis.bottom > d.rc.bottom
+        && vis.bottom - (d.rc.top + asked) <= Math.ceil(4 * sf)) {
+      this.extraPx = vis.bottom - (d.rc.top + asked);
       d.rc.bottom = vis.bottom;
       SHAppBarMessage(ABM_SETPOS, d);
     }
+    this.reservedBottom = d.rc.bottom;
   }
 
   unregister() {

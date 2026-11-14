@@ -192,6 +192,7 @@ function createBar() {
       // Step aside while a game or video is fullscreen.
       onFullscreen: setFullscreen,
     });
+    appbar.onRedock = (reason) => log('docked again:', reason);
     try { appbar.register(screen.getPrimaryDisplay()); log('docked'); }
     catch (e) { log('appbar registration failed, bar will float instead:', e && e.stack || e); }
     push();
@@ -256,6 +257,12 @@ app.whenReady().then(async () => {
   screen.on('display-added', reposition);
   screen.on('display-removed', reposition);
   setInterval(push, 1000); // keeps countdowns ticking
+  // Safety net: if Windows stopped keeping the bar's strip free, dock again.
+  setInterval(() => {
+    if (!appbar || !win || win.isDestroyed() || !win.isVisible() || fsHidden || userHidden) return;
+    try { if (appbar.lostReservation()) appbar.redock('space was no longer reserved'); }
+    catch (e) { log('dock check failed:', e.message); }
+  }, 15000);
 });
 
 app.on('second-instance', () => { if (win && !win.isDestroyed() && !win.isVisible()) toggleBar(); });
