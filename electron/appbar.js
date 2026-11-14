@@ -99,6 +99,19 @@ class AppBar {
     return mi.rcWork.top < this.reservedBottom;
   }
 
+  // True when the bar sits lower than it could: it docked below another strip (often the
+  // strip of a bar that had just crashed or been closed) and that strip has since gone.
+  misplaced() {
+    if (!this.registered || this.reservedTop == null || !this.display) return false;
+    const sf = this.display.scaleFactor, b = this.display.bounds;
+    const d = this.data({
+      left: Math.round(b.x * sf), top: Math.round(b.y * sf),
+      right: Math.round((b.x + b.width) * sf), bottom: Math.round((b.y + this.height) * sf),
+    });
+    SHAppBarMessage(ABM_QUERYPOS, d);
+    return d.rc.top < this.reservedTop;
+  }
+
   data(rc) {
     return {
       cbSize: koffi.sizeof(APPBARDATA),
@@ -162,6 +175,7 @@ class AppBar {
       SHAppBarMessage(ABM_SETPOS, d);
     }
     this.reservedBottom = d.rc.bottom;
+    this.reservedTop = d.rc.top;
   }
 
   unregister() {

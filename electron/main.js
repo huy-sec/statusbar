@@ -260,7 +260,10 @@ app.whenReady().then(async () => {
   // Safety net: if Windows stopped keeping the bar's strip free, dock again.
   setInterval(() => {
     if (!appbar || !win || win.isDestroyed() || !win.isVisible() || fsHidden || userHidden) return;
-    try { if (appbar.lostReservation()) appbar.redock('space was no longer reserved'); }
+    try {
+      if (appbar.lostReservation()) appbar.redock('space was no longer reserved');
+      else if (appbar.misplaced()) { appbar.position(screen.getPrimaryDisplay()); log('moved back up to the top'); }
+    }
     catch (e) { log('dock check failed:', e.message); }
   }, 15000);
 });
