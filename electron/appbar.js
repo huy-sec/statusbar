@@ -85,6 +85,10 @@ class AppBar {
   // Registers again from scratch, for when Windows has forgotten the bar.
   redock(reason) {
     if (!this.registered || !this.display) return;
+    // Drop the old registration first. Registering again on top of a live one gives Windows
+    // two entries for this window, and the new one gets placed *below* the old strip: the bar
+    // then sits 33 px down, over the top of every window.
+    try { SHAppBarMessage(ABM_REMOVE, this.data()); } catch {}
     this.registered = false;
     try { this.register(this.display); if (this.onRedock) this.onRedock(reason); }
     catch (e) { if (this.onRedock) this.onRedock(`${reason}, failed: ${e.message}`); }
@@ -176,6 +180,9 @@ class AppBar {
     }
     this.reservedBottom = d.rc.bottom;
     this.reservedTop = d.rc.top;
+    if (d.rc.top > Math.round(b.y * sf) && this.onRedock) {
+      this.onRedock(`placed ${d.rc.top - Math.round(b.y * sf)} px below the top of the screen`);
+    }
   }
 
   unregister() {
